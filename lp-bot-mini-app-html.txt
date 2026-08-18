@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LP Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 24px; margin-bottom: 10px; }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #2481cc;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.7; }
+        .info { color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 LP Bot Mini App</h1>
+        <p class="info" id="status">连接中...</p>
+    </div>
+
+    <div class="card">
+        <h3>快速操作</h3>
+        <button onclick="testConnection()">测试连接</button>
+        <button onclick="showPositions()">查看仓位</button>
+        <button onclick="showBalance()">查看余额</button>
+    </div>
+
+    <div id="result" class="card" style="display:none;">
+        <h3>结果</h3>
+        <pre id="resultText" style="font-size:12px;overflow-x:auto;"></pre>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        const API = 'http://127.0.0.1:3000/api';
+        let token = null;
+
+        async function init() {
+            try {
+                const user = tg.initDataUnsafe.user;
+                document.getElementById('status').textContent =
+                    `✅ 已连接 - ${user.first_name || '用户' + user.id}`;
+
+                // 认证
+                const res = await fetch(`${API}/auth`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ initData: tg.initData })
+                });
+                const data = await res.json();
+                token = data.token;
+            } catch(e) {
+                document.getElementById('status').textContent = '❌ 连接失败: ' + e.message;
+            }
+        }
+
+        async function api(path) {
+            const res = await fetch(`${API}${path}`, {
+                headers: {'Authorization': `Bearer ${token}`}
+            });
+            return res.json();
+        }
+
+        function show(data) {
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('resultText').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function testConnection() {
+            tg.showAlert('API: ' + API + '\nToken: ' + (token ? '✅' : '❌'));
+        }
+
+        async function showPositions() {
+            try {
+                const data = await api('/positions');
+                show(data);
+                tg.showAlert(`找到 ${data.length} 个仓位`);
+            } catch(e) {
+                tg.showAlert('错误: ' + e.message);
+            }
+        }
+
+        async function showBalance() {
+            try {
+                const data = await api('/balance');
+                show(data);
+            } catch(e) {
+                tg.showAlert('错误: ' + e.message);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
